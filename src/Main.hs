@@ -42,13 +42,7 @@ colorPlayer1 = 4
 colorPlayer2 :: Int
 colorPlayer2 = 5
 
--- Board variable
-
-n :: Int
-n = 3
-
 -- World types
-
 data Cell = Cell Player | None deriving (Eq, Show)
 data State = Running | GameOver Player deriving (Eq, Show)
 data Player = Player1 | Player2 deriving (Eq, Show)
@@ -59,53 +53,63 @@ data Game = Game {
   , gameAnimate :: Picture
   , gameBoard :: Board
   , gameMadeTurn :: Bool
+  , gameN :: Int
+  , gameProduct :: Float
+  , gameTileBound :: Int
   } 
 type Board = [(Int,Cell)]
 
--- Window operation
+-- Window operations
 
 window :: String -> (Int, Int) -> Display
 window programName (x,y) = InWindow programName (x, y) (0, 0)
 
--- Initial world - in the beginning of game.
+-- Initial world - Beginning of game.
 
-initialWorld:: [Picture] -> Game
-initialWorld pictures = Game {
+initialWorld:: [Picture] -> Int -> Game
+initialWorld pictures n = Game {
     gameBMP = pictures
   , gameState = Running
   , gamePlayer = Player1
   , gameAnimate = Blank
-  , gameBoard = L.zip [1..n*n] (L.take (n*n) (repeat None))
+  , gameBoard = L.zip [1..(gameN (initialWorld [Blank] n))*(gameN (initialWorld [Blank] n))] (L.take ((gameN (initialWorld [Blank] n))*(gameN (initialWorld [Blank] n))) (repeat None))
   , gameMadeTurn = False
+  , gameN = n
+  , gameProduct = (fromIntegral 3) / (fromIntegral n)
+  , gameTileBound = 200 -- Normal bound for 3x3 Board
   }
 
 -- Lists operations
 
-filterPicture       :: [(Int, Cell)] -> Player -> [Int]
-player1CellsOfBoard :: Board -> [Picture] -> Picture
-player2CellsOfBoard :: Board -> [Picture] -> Picture
-netOnBoard          :: Board -> [Picture] ->  Picture
-setWinnerNetOnBoard :: Picture -> Picture
+filterPicture       :: [(Int, Cell)] -> Player -> Int -> [Int]
+player1CellsOfBoard :: Board -> [Picture] -> Int -> Int -> Picture
+player2CellsOfBoard :: Board -> [Picture] -> Int -> Int -> Picture
+netOnBoard          :: Board -> [Picture] -> Int -> Int -> Picture
+setWinnerNetOnBoard :: Picture -> Int -> Int -> Picture
 
-filterPicture xs player = [n | (n,x) <- xs, x == Cell player]
+filterPicture xs player n = [n | (n,x) <- xs, x == Cell player]
 
-findPictures player listOfPictures = (\x -> Translate (fromIntegral ((x-1) `mod` 3) * 200) (fromIntegral ((x-1) `div` 3)*(-200)) picturePlayerList)
+findPictures player listOfPictures n bound = (\x -> Translate (fromIntegral ((x-1) `mod` n) * bound) (fromIntegral ((x-1) `div` n)*(-bound)) picturePlayerList)
  where picturePlayerList = pictures ([listOfPictures!!(if player == Player1 then 2 else 3)] <> [listOfPictures!!(if player == Player1 then 4 else 5)])
-player1CellsOfBoard board listOfPictures = pictures $ L.map finding filtering
- where filtering = filterPicture board Player1
-       finding = findPictures Player1 listOfPictures
-player2CellsOfBoard board listOfPictures = pictures $ L.map finding filtering
- where filtering = filterPicture board Player2
-       finding = findPictures Player2 listOfPictures
-netOnBoard board listOfPictures = pictures $ L.map (\x -> Translate (fromIntegral ((x-1)`mod`3)*200)  ((fromIntegral $ floor ( ( fromIntegral x+2 ) / 3 )-(fromIntegral 1 ) ) * (-200)) (listOfPictures!!squarePicture) ) [1..n*n]
-setWinnerNetOnBoard bmp = pictures $ L.map (\x -> Translate (fromIntegral ((x-1)`mod`3)*200)  ((fromIntegral $ floor ( ( fromIntegral x+2 ) / 3 )-(fromIntegral 1 ) ) * (-200)) bmp ) [1..n*n]
+player1CellsOfBoard board listOfPictures n bound = pictures $ L.map finding filtering
+ where filtering = filterPicture board Player1 n
+       finding = findPictures Player1 listOfPictures n (fromIntegral bound)
+player2CellsOfBoard board listOfPictures n bound = pictures $ L.map finding filtering
+ where filtering = filterPicture board Player2 n
+       finding = findPictures Player2 listOfPictures n (fromIntegral bound)
+netOnBoard board listOfPictures n bound = pictures $ (L.map (\z -> Translate (xParam z) (yParam z) (listOfPictures!!squarePicture)) [1..n*n])
+ where xParam z = fromIntegral $ (fromIntegral ((z-1)`mod`n)) * bound
+       yParam z = fromIntegral $ (fromIntegral $ floor (fromIntegral ( (z+(n-1)) `div` (fromIntegral n)) )-(fromIntegral 1))*(-bound)
+setWinnerNetOnBoard bmp n bound = pictures $ L.map (\z -> Translate (xParam z) (yParam z) bmp ) [1..n*n]
+ where xParam z = fromIntegral $ fromIntegral ((z-1)`mod`n)*bound
+       yParam z = fromIntegral $ floor $ fromIntegral ((( fromIntegral ( fromIntegral z + (n-1) ) `div` n )-(fromIntegral 1) ) * (-bound))
 
 -- Render operations
 
-buildWholePicture :: [Picture] -> Picture
-buildWholePicture bmps = pictures bmps
-
-translateWholeWorldPicture (x,y) = Translate (-200) (200)
+translateWholeWorldPicture2 (x,y) n = Translate ((fromIntegral n)*(-100)) ((fromIntegral n)*100)
+buildWholePicture :: [Picture] -> Int -> Picture
+buildWholePicture bmps n = Scale ((fromIntegral 3) / (fromIntegral n)) ((fromIntegral 3) / (fromIntegral n)) (pictures bmps)
+translateWholeWorldPicture (x,y) n = Translate 100 (-100)
 
 isGameOver :: Game -> Bool
 isGameOver world = checkLists
@@ -118,30 +122,36 @@ isGameOver world = checkLists
        checkO = isFull world (Cell Player2)
        checkMultipleX = isFulls world (Cell Player1)
        checkMultipleO = isFulls world (Cell Player2)
+       n = gameN world
 
 renderGameOver :: Game -> Picture
-renderGameOver world = setWinnerNetOnBoard (if winner == GameOver Player1 then bmp!!5 else bmp!!4)
+renderGameOver world = setWinnerNetOnBoard (if winner == GameOver Player1 then bmp!!5 else bmp!!4) n bound
  where board = gameBoard world
        bmp = gameBMP world
        winner = gameState world
+       n = gameN world
+       bound = gameTileBound world
 
 renderRunning :: Game -> [Picture]
 renderRunning world = [
-   (netOnBoard board bmps)
- , (player1CellsOfBoard board bmps)
- , (player2CellsOfBoard board bmps) ]
+   (netOnBoard board bmps n bound)
+ , (player1CellsOfBoard board bmps n bound)
+ , (player2CellsOfBoard board bmps n bound) ]
  where board = gameBoard world
        bmps = gameBMP world
+       n = gameN world
+       bound = gameTileBound world
 
 render :: (Int, Int) -> Game -> Picture
 render (x,y) world = case gameState world of
- Running -> translateWholeWorldPicture (x,y) (buildWholePicture $ renderRunning world)
- GameOver Player1 -> translateWholeWorldPicture (x,y) (renderGameOver world)
- GameOver Player2 -> translateWholeWorldPicture (x,y) (renderGameOver world)
+ Running -> buildWholePicture (L.map (\z -> translateWholeWorldPicture2 (x,y) (gameN world) $ (translate1 z)) (renderRunning world) ) (gameN world)
+  where translate1 z = (translateWholeWorldPicture (x,y) (gameN world) z) 
+ GameOver Player1 -> (buildWholePicture [translateWholeWorldPicture2 (x,y) (gameN world) (translateWholeWorldPicture (x,y) (gameN world) (renderGameOver world) )] (gameN world))
+ GameOver Player2 -> (buildWholePicture [translateWholeWorldPicture2 (x,y) (gameN world) (translateWholeWorldPicture (x,y) (gameN world) (renderGameOver world))] (gameN world))
 
 -- Event operations (Mouse)
 
-changePlayer :: Game -> Game
+changePlayer :: Game -> Game  -- TODO: Fix bug (clicking on tile occupied by opposite player should not change turn)
 changePlayer world = case gamePlayer world of
  Player1 -> if (gameMadeTurn world) == True then  world {gamePlayer = Player2, gameMadeTurn = False} else world
  Player2 -> if (gameMadeTurn world) == True then  world {gamePlayer = Player1, gameMadeTurn = False} else world
@@ -149,14 +159,14 @@ changePlayer world = case gamePlayer world of
 mousePosToInt :: (Float, Float) -> (Int, Int)
 mousePosToInt (x, y) = (floor x+300, floor y+300)
 
-oneTileCheck :: (Int,Int) -> Board -> Int -> Bool
-oneTileCheck (x,y) board z = (x >= 200*(((z-1)`mod`3))) && (x <= 200+200*((z-1)`mod`3)) && (y-600 <= (-200)*((z-1)`div`3)) && (y - 600 >= -200-200*((z-1)`div`3)) && (((snd (board!!(z-1)) ) == None))
+oneTileCheck :: (Int,Int) -> Board -> Int -> Int -> Int -> Bool
+oneTileCheck (x,y) board z bound n = (x >= bound*(((z-1)`mod`n))) && (x <= bound+bound*((z-1)`mod`n)) && ( y-floor (600 * (fromIntegral n/3)) <= (-bound)*((z-1)`div`n)) && (  y-floor (600 * (fromIntegral n/3)) >= (-bound)-bound*((z-1)`div`n)) && (((snd (board!!(z-1)) ) == None))
 
-listTileCheck :: (Int, Int) -> Board -> Bool
-listTileCheck mousePos board = or $ (L.map (oneTileCheck mousePos board) [1 .. n*n])
+listTileCheck :: (Int, Int) -> Board -> Int -> Int -> Float -> Bool
+listTileCheck (x,y) board n bound scale = or $ (L.map (oneTileCheck (x, y) board (bound) n) [1 .. n*n])
 
-oneTileFind :: (Int,Int) -> Board -> Int
-oneTileFind (x,y) board = L.sum $ L.map (\z -> if oneTileCheck (x,y) board z then z else 0) [1..n*n]
+oneTileFind :: (Int,Int) -> Board -> Int -> Int -> Int
+oneTileFind (x,y) board n bound = L.sum $ L.map (\z -> if oneTileCheck (floor (fromIntegral x/(3/(fromIntegral n))),floor (fromIntegral y/(3/(fromIntegral n)))) board z bound n  then z else 0) [1..n*n]
 
 transferChange :: Player -> (Int, Cell) -> (Int, Cell)
 transferChange z (x, y) = (x, (Cell z))
@@ -164,26 +174,32 @@ transferChange z (x, y) = (x, (Cell z))
 playerTurn :: Game -> (Int, Int) -> Game
 playerTurn world (x,y) = if isBasicRequirements then (world {gameBoard = gameBoardAdd, gameMadeTurn = True}) else world
  where gameBoardAdd = L.map (\(a,b) -> if a == tilefind then transferChange player (a,b) else (a,b)) board
-       isBasicRequirements = (x >= 0 && x <= 600 && y >= 0 && y <= 600) && listTileCheck (x,y) board
-       tilefind = oneTileFind (x,y) board
+       isBasicRequirements = (x >= 0 && x <= 600 && y >= 0 && y <= 600) -- not usable for now -- && listTileCheck (x,y) board n bound (gameProduct world)
+       tilefind = oneTileFind (x,y) board n bound
        player = gamePlayer world
        board = gameBoard world
+       n = gameN world
+       bound = gameTileBound world
 
 -- Logic
 isAny :: Game -> Cell -> [Int] -> Bool
 isAny world cell which = or $ L.map (\z -> if (snd (board!!(z-1)) == cell) then True else False) which
  where board = gameBoard world
-isFulls :: Game -> Cell -> [Int] -> Bool
+isFulls :: Game -> Cell -> [Int]  -> Bool
 isFulls world cell which = or $ L.map (isFull world cell) (L.init (L.map (\z -> L.take n $ L.drop z which) [0, n .. n*n]))
+ where n = gameN world
 isFull :: Game -> Cell -> [Int] -> Bool
 isFull world cell which = and $ L.map (\z -> if (snd (board!!(z-1)) == cell) then True else False) which
  where board = gameBoard world
+       n = gameN world
 
 logic (EventKey (MouseButton LeftButton) Up _ mousePos) world = case gameState world of
- GameOver _ -> initialWorld (gameBMP world)
+ GameOver _ -> initialWorld (gameBMP world) (gameN world)
  Running -> (if isGameOver world then world {gameState = GameOver (gamePlayer world)} else continueRender)
-  where continueRender = changePlayer (playerTurn world $ mousePosToInt mousePos) 
-logic (EventKey (Char 'r') Up _ mousePos) world = initialWorld (gameBMP world)
+  where continueRender = if True then changePlayer (playerTurn world $ mousePosToInt mousePos) else undefined
+logic (EventKey (Char 'r') Up _ mousePos) world = initialWorld (gameBMP world) (gameN world)
+logic (EventKey (SpecialKey KeyUp) Up _ mousePos) world = initialWorld (gameBMP world) ((gameN world)+1)
+logic (EventKey (SpecialKey KeyDown) Up _ mousePos) world = if (gameN world) == 2 then world else initialWorld (gameBMP world) ((gameN world)-1)
 logic _ world = if isGameOver world then world {gameState = GameOver (gamePlayer world)} else world
 -- Animation - not implemented yet
 
@@ -209,4 +225,5 @@ main = do
        Right x6 <- readBMP "colorplayer2.bmp"
        (x,y) <- getScreenSize
        xs <- bmpConvertToPicture (bmpChangeColor $ x1:x2:x3:x4:x5:x6:[])
-       play (window "name" (x,y)) backgroundColor fps (initialWorld xs) (render (x,y)) logic animation'
+       n <- pure 3
+       play (window "TicTacToe" (x,y)) backgroundColor fps (initialWorld xs n) (render (x,y)) logic animation'
