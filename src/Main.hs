@@ -201,7 +201,7 @@ bmpConvertToPicture bmps = return $ L.map (\x -> bitmapOfBMP x) bmps
 
 main :: IO ()
 main = do 
-       Right x1 <- readBMP "hero.bmp"
+       Right x1 <- readBMP "nothing.bmp"
        Right x2 <- readBMP "squarepicture.bmp"
        Right x3 <- readBMP "xpicture.bmp"
        Right x4 <- readBMP "opicture.bmp"
