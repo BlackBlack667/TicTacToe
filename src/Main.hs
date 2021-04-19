@@ -82,21 +82,21 @@ initialWorld pictures n = Game {
 -- Lists operations
 
 filterPicture       :: [(Int, Cell)] -> Player -> Int -> [Int]
-player1CellsOfBoard :: Board -> [Picture] -> Int -> Int -> Picture
-player2CellsOfBoard :: Board -> [Picture] -> Int -> Int -> Picture
+player1CellsOfBoard :: Board -> [Picture] -> Int -> Int -> State -> Picture
+player2CellsOfBoard :: Board -> [Picture] -> Int -> Int -> State -> Picture
 netOnBoard          :: Board -> [Picture] -> Int -> Int -> Picture
 setWinnerNetOnBoard :: Picture -> Int -> Int -> Picture
 
 filterPicture xs player n = [n | (n,x) <- xs, x == Cell player]
 
-findPictures player listOfPictures n bound = (\x -> Translate (fromIntegral ((x-1) `mod` n) * bound) (fromIntegral ((x-1) `div` n)*(-bound)) picturePlayerList)
- where picturePlayerList = pictures ([listOfPictures!!(if player == Player1 then 2 else 3)] <> [listOfPictures!!(if player == Player1 then 4 else 5)])
-player1CellsOfBoard board listOfPictures n bound = pictures $ L.map finding filtering
+findPictures player listOfPictures n bound state = (\x -> Translate (fromIntegral ((x-1) `mod` n) * bound) (fromIntegral ((x-1) `div` n)*(-bound)) picturePlayerList)
+ where picturePlayerList = pictures ([listOfPictures!!(if player == Player1 then 2 else 3)] <> (if state == Running then [listOfPictures!!(if player == Player1 then 4 else 5)] else [Blank])   )
+player1CellsOfBoard board listOfPictures n bound state = pictures $ L.map finding filtering
  where filtering = filterPicture board Player1 n
-       finding = findPictures Player1 listOfPictures n (fromIntegral bound)
-player2CellsOfBoard board listOfPictures n bound = pictures $ L.map finding filtering
+       finding = findPictures Player1 listOfPictures n (fromIntegral bound) state
+player2CellsOfBoard board listOfPictures n bound state = pictures $ L.map finding filtering
  where filtering = filterPicture board Player2 n
-       finding = findPictures Player2 listOfPictures n (fromIntegral bound)
+       finding = findPictures Player2 listOfPictures n (fromIntegral bound) state
 netOnBoard board listOfPictures n bound = pictures $ (L.map (\z -> Translate (xParam z) (yParam z) (listOfPictures!!squarePicture)) [1..n*n])
  where xParam z = fromIntegral $ (fromIntegral ((z-1)`mod`n)) * bound
        yParam z = fromIntegral $ (fromIntegral $ floor (fromIntegral ( (z+(n-1)) `div` (fromIntegral n)) )-(fromIntegral 1))*(-bound)
@@ -109,7 +109,7 @@ setWinnerNetOnBoard bmp n bound = pictures $ L.map (\z -> Translate (xParam z) (
 translateWholeWorldPicture2 (x,y) n = Translate ((fromIntegral n)*(-100)) ((fromIntegral n)*100)
 buildWholePicture :: [Picture] -> Int -> Picture
 buildWholePicture bmps n = Scale ((fromIntegral 3) / (fromIntegral n)) ((fromIntegral 3) / (fromIntegral n)) (pictures bmps)
-translateWholeWorldPicture (x,y) n = Translate 100 (-100)
+translateWholeWorldPicture (x,y) = Translate 100 (-100)
 
 isGameOver :: Game -> Bool
 isGameOver world = checkLists
@@ -135,23 +135,24 @@ renderGameOver world = setWinnerNetOnBoard (if winner == GameOver Player1 then b
 renderRunning :: Game -> [Picture]
 renderRunning world = [
    (netOnBoard board bmps n bound)
- , (player1CellsOfBoard board bmps n bound)
- , (player2CellsOfBoard board bmps n bound) ]
+ , (player1CellsOfBoard board bmps n bound state)
+ , (player2CellsOfBoard board bmps n bound state) ]
  where board = gameBoard world
        bmps = gameBMP world
        n = gameN world
        bound = gameTileBound world
+       state = gameState world
 
 render :: (Int, Int) -> Game -> Picture
 render (x,y) world = case gameState world of
  Running -> buildWholePicture (L.map (\z -> translateWholeWorldPicture2 (x,y) (gameN world) $ (translate1 z)) (renderRunning world) ) (gameN world)
-  where translate1 z = (translateWholeWorldPicture (x,y) (gameN world) z) 
- GameOver Player1 -> (buildWholePicture [translateWholeWorldPicture2 (x,y) (gameN world) (translateWholeWorldPicture (x,y) (gameN world) (renderGameOver world) )] (gameN world))
- GameOver Player2 -> (buildWholePicture [translateWholeWorldPicture2 (x,y) (gameN world) (translateWholeWorldPicture (x,y) (gameN world) (renderGameOver world))] (gameN world))
+  where translate1 z = translateWholeWorldPicture (x,y) z
+ GameOver Player1 -> (buildWholePicture [translateWholeWorldPicture2 (x,y) (gameN world) (translateWholeWorldPicture (x,y) $ pictures $ (renderRunning world) <> [renderGameOver world] )] (gameN world))
+ GameOver Player2 -> (buildWholePicture [translateWholeWorldPicture2 (x,y) (gameN world) (translateWholeWorldPicture (x,y) $ pictures $ (renderRunning world) <> [renderGameOver world] )] (gameN world))
 
 -- Event operations (Mouse)
 
-changePlayer :: Game -> Game  -- TODO: Fix bug (clicking on tile occupied by opposite player should not change turn)
+changePlayer :: Game -> Game    -- TODO: see line 175
 changePlayer world = case gamePlayer world of
  Player1 -> if (gameMadeTurn world) == True then  world {gamePlayer = Player2, gameMadeTurn = False} else world
  Player2 -> if (gameMadeTurn world) == True then  world {gamePlayer = Player1, gameMadeTurn = False} else world
@@ -171,10 +172,22 @@ oneTileFind (x,y) board n bound = L.sum $ L.map (\z -> if oneTileCheck (floor (f
 transferChange :: Player -> (Int, Cell) -> (Int, Cell)
 transferChange z (x, y) = (x, (Cell z))
 
+isRightCordinate :: (Int, Int) -> Board -> Int -> Int -> Int -> Bool  -- broken function for elimaniting bug. TODO: repair it
+isRightCordinate (x,y) board bound z n = if (x >= bound*(((z-1)`mod`n))) && (x <= bound+bound*((z-1)`mod`n)) && (y-600 <= (-bound)*((z-1)`div`n)) && (y-600 >= (-bound)-bound*((z-1)`div`n)) then True else False
+
+isOpposite :: (Int, Int) -> Game -> Int -> Bool -- TODO: see line 175
+isOpposite (x,y) world 0 = False
+isOpposite (x,y) world n = if conditions then True else (isOpposite (x,y) world (n-1))
+ where board = gameBoard world
+       bound = gameTileBound world
+       player = gamePlayer world
+       conditions = (isRightCordinate (floor (fromIntegral x/(3/(fromIntegral n))),floor (fromIntegral y/(3/(fromIntegral n)))) board (floor(fromIntegral bound * ((fromIntegral 3)/(fromIntegral n)))) n (gameN world)) && (snd (board!!(n-1)) /= None)
+       
+
 playerTurn :: Game -> (Int, Int) -> Game
 playerTurn world (x,y) = if isBasicRequirements then (world {gameBoard = gameBoardAdd, gameMadeTurn = True}) else world
  where gameBoardAdd = L.map (\(a,b) -> if a == tilefind then transferChange player (a,b) else (a,b)) board
-       isBasicRequirements = (x >= 0 && x <= 600 && y >= 0 && y <= 600) -- not usable for now -- && listTileCheck (x,y) board n bound (gameProduct world)
+       isBasicRequirements = (x >= 0 && x <= 600 && y >= 0 && y <= 600) -- && (not $ isOpposite (x,y) world (n*n)) -- not usable for now -- && listTileCheck (x,y) board n bound (gameProduct world)
        tilefind = oneTileFind (x,y) board n bound
        player = gamePlayer world
        board = gameBoard world
@@ -201,6 +214,7 @@ logic (EventKey (Char 'r') Up _ mousePos) world = initialWorld (gameBMP world) (
 logic (EventKey (SpecialKey KeyUp) Up _ mousePos) world = initialWorld (gameBMP world) ((gameN world)+1)
 logic (EventKey (SpecialKey KeyDown) Up _ mousePos) world = if (gameN world) == 2 then world else initialWorld (gameBMP world) ((gameN world)-1)
 logic _ world = if isGameOver world then world {gameState = GameOver (gamePlayer world)} else world
+
 -- Animation - not implemented yet
 
 animation' = const id
