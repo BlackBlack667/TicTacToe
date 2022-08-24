@@ -40,6 +40,10 @@ library
       bmp,
       gloss
   default-language: Haskell2010
+  -- We have to do this because our gloss/GLUT dependencies don't automatically
+  -- propagate this C dependency for some reason
+  pkgconfig-depends:
+        freeglut
 
 executable TicTacToe-exe
   main-is: Main.hs
