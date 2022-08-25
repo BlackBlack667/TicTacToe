@@ -10,23 +10,6 @@ let
   # If haskellNix is not found run:
   #   niv add input-output-hk/haskell.nix -n haskellNix
 
-  freetype-overlay = self: super:
-    {
-      libpng = super.libpng.overrideAttrs(old: if !self.stdenv.hostPlatform.isWindows then {} else {
-        # freetype on windows complains about the presence of the .la file
-        # removing it seems to work
-        postInstall = ''
-          rm $out/lib/libpng16.la
-        '';
-      });
-      freetype = super.freetype.overrideAttrs(old: if !self.stdenv.hostPlatform.isWindows then {} else {
-        # See https://github.com/NixOS/nixpkgs/issues/160323
-        # We can just remove these and then we'll avoid the `wrapProgram` (and therefore bash) dependency
-        nativeBuildInputs = [];
-        postInstall = "";
-      });
-    };
-
   freeglut-overlay = self: super:
     {
       freeglut = super.freeglut.overrideAttrs(old: if !self.stdenv.hostPlatform.isWindows then {} else {
@@ -48,9 +31,9 @@ let
     # the haskell.nix functionality itself as an overlay.
     {
       config = haskellNix.nixpkgsArgs.config;
-      overlays = haskellNix.nixpkgsArgs.overlays ++ [ freetype-overlay freeglut-overlay ];
+      overlays = haskellNix.nixpkgsArgs.overlays ++ [ freeglut-overlay ];
     };
-in pkgs.haskell-nix.project {
+in pkgs.haskell-nix.cabalProject {
   # 'cleanGit' cleans a source directory based on the files known by git
   src = pkgs.haskell-nix.haskellLib.cleanGit {
     name = "TicTacToe";

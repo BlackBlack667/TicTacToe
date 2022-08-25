@@ -1,14 +1,14 @@
 {
     "haskellNix": {
-        "branch": "armando-opengl32-mapping",
+        "branch": "master",
         "description": "Alternative Haskell Infrastructure for Nixpkgs",
         "homepage": "https://input-output-hk.github.io/haskell.nix",
-        "owner": "ramirez7",
+        "owner": "input-output-hk",
         "repo": "haskell.nix",
-        "rev": "1b8e7e33429eca1a4dafc1aaa6191d23b6a634fa",
-        "sha256": "0jvmxkkvgzrc1fxm44vbw48abqb56mpcavbqwzj23dzycl4z264i",
+        "rev": "2fbc0266ff4bc8af34562748ed0a670032061e96",
+        "sha256": "118pi3vczrbwa875zf1b5dh5jq8wjj8qbvhld8yn45p9ndaicjvm",
         "type": "tarball",
-        "url": "https://github.com/ramirez7/haskell.nix/archive/1b8e7e33429eca1a4dafc1aaa6191d23b6a634fa.tar.gz",
+        "url": "https://github.com/input-output-hk/haskell.nix/archive/2fbc0266ff4bc8af34562748ed0a670032061e96.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "niv": {
