@@ -1,0 +1,4 @@
+# cabal work directory
+dist-newstyle/
+# nix-build outputs have a result prefix by convention
+result*
