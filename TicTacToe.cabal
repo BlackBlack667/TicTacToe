@@ -36,8 +36,12 @@ library
   default-language: Haskell2010
   -- We have to do this because our gloss/GLUT dependencies don't automatically
   -- propagate this C dependency for some reason
-  pkgconfig-depends:
-        freeglut
+  if os(windows)
+    pkgconfig-depends:
+      freeglut
+  else
+    pkgconfig-depends:
+      glut
 
 executable TicTacToe-exe
   main-is: Main.hs
